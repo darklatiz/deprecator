@@ -1,0 +1,36 @@
+{
+  "endpoints": [
+    {
+      "path": "/endpoint1",
+      "deprecated": true,
+      "condition": "date",
+      "condition_value": "2023-10-01",
+      "headers": [
+        {
+          "name": "wm_market",
+          "values": [
+            "zone_1",
+            "zone_2"
+          ],
+          "action": "allow" // <-- to have a simplified list
+        },
+        {
+          "name": "tenant",
+          "values": [
+            "0"
+          ],
+          "action": "reject"
+        }
+      ],
+      "bypass": [
+        {
+          "name": "X-Client-Token",
+          "values": [
+            "abcd1234",
+            "efgh5678"
+          ]
+        }
+      ]
+    }
+  ]
+}
