@@ -1,34 +1,35 @@
 {
+  "base_headers": [
+    {
+      "name": "X-Base-Header-1",
+      "values": ["baseValueA", "baseValueB"],
+      "action": "reject"
+    },
+    {
+      "name": "X-Base-Header-2",
+      "values": ["baseValueX", "baseValueY"],
+      "action": "allow"
+    }
+  ],
   "endpoints": [
     {
       "path": "/endpoint1",
-      "deprecated": true,
-      "condition": "date",
-      "condition_value": "2023-10-01",
       "headers": [
         {
-          "name": "wm_market",
-          "values": [
-            "zone_1",
-            "zone_2"
-          ],
-          "action": "allow" // <-- to have a simplified list
-        },
-        {
-          "name": "tenant",
-          "values": [
-            "0"
-          ],
-          "action": "reject"
+          "name": "X-Client-Version",
+          "values": ["2.0", "2.1"],
+          "action": "allow"
         }
       ],
-      "bypass": [
+      "override_base_headers": true
+    },
+    {
+      "path": "/endpoint2",
+      "headers": [
         {
-          "name": "X-Client-Token",
-          "values": [
-            "abcd1234",
-            "efgh5678"
-          ]
+          "name": "X-Endpoint2-Header",
+          "values": ["valueE2"],
+          "action": "reject"
         }
       ]
     }
