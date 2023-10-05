@@ -22,30 +22,36 @@ public class HeaderValidationFilter implements Filter {
     }
 
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-      throws IOException, ServletException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        EndpointConfiguration endpointConfig = JsonUtil.readEndpointConfiguration();
 
-        String requestPath = ((HttpServletRequest) request).getRequestURI();
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
 
-        Optional<Endpoint> matchingEndpoint = config.getEndpoints().stream()
-          .filter(endpoint -> requestPath.equals(endpoint.getPath()))
+        Optional<Endpoint> matchedEndpoint = endpointConfig.getEndpoints().stream()
+          .filter(endpoint -> httpRequest.getServletPath().equals(endpoint.getPath()))
           .findFirst();
 
-        if (matchingEndpoint.isPresent()) {
-            Endpoint endpoint = matchingEndpoint.get();
+        if (matchedEndpoint.isPresent()) {
+            Endpoint endpoint = matchedEndpoint.get();
 
-            List<Header> effectiveHeaders = endpoint.isOverrideBaseHeaders() ?
-              mergeHeaders(config.getBaseHeaders(), endpoint.getHeaders()) : config.getBaseHeaders();
-
-            if (!headersMatch(request, effectiveHeaders)) {
-                // Reject the request or redirect as necessary.
-                ((HttpServletResponse) response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+            // First, validate against base_headers
+            if (!headersMatch(request, endpointConfig.getBaseHeaders())) {
+                rejectRequest(response);
                 return;
+            }
+
+            // Then, validate against endpoint-specific headers
+            if (endpoint.getOverrideBaseHeaders() == null || !endpoint.getOverrideBaseHeaders()) {
+                if (!headersMatch(request, endpoint.getHeaders())) {
+                    rejectRequest(response);
+                    return;
+                }
             }
         }
 
         chain.doFilter(request, response);
     }
+
 
     private boolean headersMatch(ServletRequest request, List<Header> headers) {
         return headers.stream().allMatch(header -> {
