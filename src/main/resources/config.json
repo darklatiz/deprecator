@@ -1,38 +1,71 @@
 {
-
   "base_headers": [
     {
-      "name": "X-Base-Header-1",
-      "values": ["baseValueA", "baseValueB"],
-      "action": "reject"
-    },
-    {
-      "name": "X-Base-Header-2",
-      "values": ["baseValueX", "baseValueY"],
-      "action": "allow"
+      "name": "X-Base-Header",
+      "values": ["A", "B"],
+      "action": "allow",
+      "conditional_headers": {
+        "A": [
+          {
+            "name": "Other-Base-Header01",
+            "action": "allow",
+            "values": ["value_A1"]
+          }
+        ],
+        "B": [
+          {
+            "name": "Other-Base-Header02",
+            "action": "reject",
+            "values": ["forbidden_value_B1"]
+          }
+        ]
+      }
     }
   ],
   "endpoints": [
     {
       "path": "/endpoint1",
+      "deprecated": true,
+      "condition": "date",
+      "condition_value": "2023-10-01",
       "headers": [
         {
-          "name": "X-Client-Version",
-          "values": ["2.0", "2.1"],
-          "action": "allow"
+          "name": "X-Header",
+          "values": ["1", "2", "3", "4"],
+          "action": "allow",
+          "conditional_headers": {
+            "1": [
+              {
+                "name": "Other-Header01",
+                "action": "allow",
+                "values": ["some_value"]
+              },
+              {
+                "name": "X-Header10",
+                "action": "reject",
+                "values": ["forbidden_value"]
+              }
+            ],
+            "4": [
+              {
+                "name": "Other-Header10",
+                "action": "allow",
+                "values": ["yet_another_value"]
+              }
+            ]
+          }
         }
       ],
-      "override_base_headers": true
-    },
-    {
-      "path": "/endpoint2",
-      "headers": [
+      "override_base_headers": true,
+      "bypass": [
         {
-          "name": "X-Endpoint2-Header",
-          "values": ["valueE2"],
-          "action": "reject"
+          "name": "X-Client-Token",
+          "values": ["abcd1234", "efgh5678"]
         }
       ]
+    },
+    {
+      "path": "/endpoint2"
     }
   ]
 }
