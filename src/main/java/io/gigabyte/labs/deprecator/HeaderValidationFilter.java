@@ -36,15 +36,14 @@ public class HeaderValidationFilter implements Filter {
                 return;
             }
 
-            // Validate against base_headers
-            if (!headersMatch(httpRequest, endpointConfig.getBaseHeaders())) {
-                rejectRequest(response);
-                return;
-            }
-
-            // Then, validate against endpoint-specific headers
-            if (endpoint.getOverrideBaseHeaders() == null || !endpoint.getOverrideBaseHeaders()) {
+            // Validate against endpoint-specific headers or fall back to base_headers if endpoint headers don't exist
+            if (endpoint.getHeaders() != null && !endpoint.getHeaders().isEmpty()) {
                 if (!headersMatch(httpRequest, endpoint.getHeaders())) {
+                    rejectRequest(response);
+                    return;
+                }
+            } else {
+                if (!headersMatch(httpRequest, endpointConfig.getBaseHeaders())) {
                     rejectRequest(response);
                     return;
                 }
