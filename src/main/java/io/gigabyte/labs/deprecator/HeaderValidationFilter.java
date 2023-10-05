@@ -13,18 +13,15 @@ import java.util.stream.Collectors;
 
 public class HeaderValidationFilter implements Filter {
 
-    private EndpointConfiguration config; // Assume this is populated from the JSON.
+    private EndpointConfiguration endpointConfig;
 
-    @Override
-    public void init(FilterConfig filterConfig) {
-        // Initialize your filter here (like reading the configuration).
-        // For the sake of example, let's assume EndpointConfiguration is loaded.
+    @PostConstruct
+    public void init() {
+        this.endpointConfig = JsonUtil.readEndpointConfiguration();
     }
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        EndpointConfiguration endpointConfig = JsonUtil.readEndpointConfiguration();
-
         HttpServletRequest httpRequest = (HttpServletRequest) request;
 
         Optional<Endpoint> matchedEndpoint = endpointConfig.getEndpoints().stream()
@@ -34,15 +31,20 @@ public class HeaderValidationFilter implements Filter {
         if (matchedEndpoint.isPresent()) {
             Endpoint endpoint = matchedEndpoint.get();
 
-            // First, validate against base_headers
-            if (!headersMatch(request, endpointConfig.getBaseHeaders())) {
+            if (isBypassed(httpRequest, endpoint.getBypass())) {
+                chain.doFilter(request, response);
+                return;
+            }
+
+            // Validate against base_headers
+            if (!headersMatch(httpRequest, endpointConfig.getBaseHeaders())) {
                 rejectRequest(response);
                 return;
             }
 
             // Then, validate against endpoint-specific headers
             if (endpoint.getOverrideBaseHeaders() == null || !endpoint.getOverrideBaseHeaders()) {
-                if (!headersMatch(request, endpoint.getHeaders())) {
+                if (!headersMatch(httpRequest, endpoint.getHeaders())) {
                     rejectRequest(response);
                     return;
                 }
@@ -52,36 +54,41 @@ public class HeaderValidationFilter implements Filter {
         chain.doFilter(request, response);
     }
 
+    private boolean headersMatch(HttpServletRequest request, List<Header> headers) {
+        if (headers == null || headers.isEmpty()) {
+            return true;
+        }
 
-    private boolean headersMatch(ServletRequest request, List<Header> headers) {
         return headers.stream().allMatch(header -> {
-            String headerValue = ((HttpServletRequest) request).getHeader(header.getName());
+            String headerValue = Optional.ofNullable(request.getHeader(header.getName())).orElse("").toLowerCase();
 
-            if ("reject".equals(header.getAction())) {
-                return !header.getValues().contains(headerValue);
-            } else if ("allow".equals(header.getAction())) {
-                return header.getValues().contains(headerValue);
+            // ... (rest of the headersMatch function logic)
+
+            Map<String, List<Header>> conditionalHeaders = header.getConditionalHeaders();
+            if (conditionalHeaders != null && conditionalHeaders.containsKey(headerValue)) {
+                return headersMatch(request, conditionalHeaders.get(headerValue));
             }
 
-            return true; // Default behavior.
+            return true;
         });
     }
 
-    private List<Header> mergeHeaders(List<Header> baseHeaders, List<Header> endpointHeaders) {
-        List<Header> mergedHeaders = new ArrayList<>(baseHeaders);
-
-        for (Header endpointHeader : endpointHeaders) {
-            mergedHeaders = mergedHeaders.stream()
-              .filter(baseHeader -> !baseHeader.getAction().equals(endpointHeader.getAction()))
-              .collect(Collectors.toList());
-            mergedHeaders.add(endpointHeader);
+    private boolean isBypassed(HttpServletRequest request, List<Header> bypassHeaders) {
+        if (bypassHeaders == null) {
+            return false;
         }
-
-        return mergedHeaders;
+        return bypassHeaders.stream().anyMatch(header -> {
+            String headerValue = request.getHeader(header.getName());
+            return header.getValues().contains(headerValue);
+        });
     }
 
-    @Override
-    public void destroy() {
-        // Cleanup resources (if any).
+    private void rejectRequest(ServletResponse response) throws IOException {
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
+        httpResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+        httpResponse.getWriter().write("Request headers do not meet the required criteria.");
+        httpResponse.flushBuffer();
     }
+
+    // ... other methods and utility functions
 }
